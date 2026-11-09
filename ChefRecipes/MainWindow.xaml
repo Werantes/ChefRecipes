@@ -8,20 +8,48 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Column="0" Margin="0,0,10,0">
-            <Button Content="Добавить" Click="Add_Click" Margin="0,0,0,5"/>
-            <Button Content="Удалить" Click="Delete_Click" Margin="0,0,0,10"/>
-            <ListBox x:Name="RecipesList" SelectionChanged="RecipesList_SelectionChanged"/>
-        </StackPanel>
+        <Grid Grid.Column="0" Margin="0,0,10,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Button Grid.Row="0" Content="Добавить" Click="Add_Click" Margin="0,0,0,5"/>
+            <Button Grid.Row="1" Content="Редактировать" Click="Edit_Click" Margin="0,0,0,5"/>
+            <Button Grid.Row="2" Content="Удалить" Click="Delete_Click" Margin="0,0,0,10"/>
+            <ListBox Grid.Row="3" x:Name="RecipesList" SelectionChanged="RecipesList_SelectionChanged"/>
+        </Grid>
 
-        <StackPanel Grid.Column="1">
-            <TextBlock x:Name="TitleText" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
-            <TextBlock x:Name="DescText" TextWrapping="Wrap" Margin="0,0,0,10"/>
-            <TextBlock x:Name="TimeText" FontWeight="Bold" Margin="0,0,0,10"/>
-            <TextBlock Text="Ингредиенты:" FontWeight="Bold" Margin="0,10,0,5"/>
-            <ListBox x:Name="IngredientsList" Margin="0,0,0,10"/>
-            <TextBlock Text="Приготовление:" FontWeight="Bold" Margin="0,0,0,5"/>
-            <ListBox x:Name="StepsList"/>
-        </StackPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock x:Name="TitleText" FontSize="20" FontWeight="Bold" Margin="0,0,0,10"/>
+                <TextBlock x:Name="DescText" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                <TextBlock x:Name="TimeText" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                <TextBlock Text="Ингредиенты:" FontWeight="Bold" Margin="0,10,0,5"/>
+                <Border BorderBrush="#828790" BorderThickness="1" Background="White"
+                        Padding="8" Margin="0,0,0,10">
+                    <ItemsControl x:Name="IngredientsList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
+                <TextBlock Text="Приготовление:" FontWeight="Bold" Margin="0,0,0,5"/>
+                <Border BorderBrush="#828790" BorderThickness="1" Background="White" Padding="8">
+                    <ItemsControl x:Name="StepsList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,3"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Window>

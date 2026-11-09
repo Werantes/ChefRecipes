@@ -7,12 +7,16 @@ namespace ChefRecipes
 {
     public partial class MainWindow : Window
     {
-        private AppDbContext db;
-
         public MainWindow()
         {
             InitializeComponent();
-            db = new AppDbContext();
+            SeedDatabase();
+            RefreshList();
+        }
+
+        private static void SeedDatabase()
+        {
+            using var db = new AppDbContext();
             db.Database.EnsureCreated();
 
             if (!db.Recipes.Any())
@@ -35,12 +39,11 @@ namespace ChefRecipes
                 });
                 db.SaveChanges();
             }
-
-            RefreshList();
         }
 
         private void RefreshList()
         {
+            using var db = new AppDbContext();
             RecipesList.ItemsSource = db.Recipes.ToList();
             RecipesList.DisplayMemberPath = "Title";
         }
@@ -49,39 +52,83 @@ namespace ChefRecipes
         {
             if (RecipesList.SelectedItem is Recipe recipe)
             {
-                db.Entry(recipe).Collection(r => r.Ingredients).Load();
-                db.Entry(recipe).Collection(r => r.Steps).Load();
-
-                TitleText.Text = recipe.Title;
-                DescText.Text = recipe.Description;
-                TimeText.Text = $"Время: {recipe.CookingTimeMinutes} мин";
-
-                IngredientsList.ItemsSource = recipe.Ingredients
-                    .Select(i => $"{i.Name} - {i.Quantity}").ToList();
-
-                StepsList.ItemsSource = recipe.Steps
-                    .OrderBy(s => s.StepNumber)
-                    .Select(s => $"{s.StepNumber}. {s.Description}").ToList();
+                ShowDetails(recipe.Id);
             }
+        }
+
+        private void ShowDetails(int recipeId)
+        {
+            using var db = new AppDbContext();
+            var recipe = db.Recipes.FirstOrDefault(r => r.Id == recipeId);
+            if (recipe == null) return;
+
+            db.Entry(recipe).Collection(r => r.Ingredients).Load();
+            db.Entry(recipe).Collection(r => r.Steps).Load();
+
+            TitleText.Text = recipe.Title;
+            DescText.Text = recipe.Description;
+            TimeText.Text = $"Время: {recipe.CookingTimeMinutes} мин";
+
+            IngredientsList.ItemsSource = recipe.Ingredients
+                .Select(i => $"{i.Name} - {i.Quantity}").ToList();
+
+            StepsList.ItemsSource = recipe.Steps
+                .OrderBy(s => s.StepNumber)
+                .Select(s => $"{s.StepNumber}. {s.Description}").ToList();
         }
 
         private void Add_Click(object sender, RoutedEventArgs e)
         {
-            var window = new AddRecipeWindow(db);
+            var window = new AddRecipeWindow();
             if (window.ShowDialog() == true)
             {
                 RefreshList();
             }
         }
 
+        private void Edit_Click(object sender, RoutedEventArgs e)
+        {
+            if (RecipesList.SelectedItem is Recipe selected)
+            {
+                int id = selected.Id;
+                var window = new AddRecipeWindow(id);
+                if (window.ShowDialog() == true)
+                {
+                    RefreshList();
+                    SelectRecipeById(id);
+                }
+            }
+            else
+            {
+                MessageBox.Show("Выберите рецепт для редактирования!");
+            }
+        }
+
+        private void SelectRecipeById(int id)
+        {
+            foreach (var item in RecipesList.Items)
+            {
+                if (item is Recipe r && r.Id == id)
+                {
+                    RecipesList.SelectedItem = r;
+                    return;
+                }
+            }
+        }
+
         private void Delete_Click(object sender, RoutedEventArgs e)
         {
-            if (RecipesList.SelectedItem is Recipe recipe)
+            if (RecipesList.SelectedItem is Recipe selected)
             {
                 if (MessageBox.Show("Удалить?", "Подтверждение", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
                 {
-                    db.Recipes.Remove(recipe);
-                    db.SaveChanges();
+                    using var db = new AppDbContext();
+                    var recipe = db.Recipes.FirstOrDefault(r => r.Id == selected.Id);
+                    if (recipe != null)
+                    {
+                        db.Recipes.Remove(recipe);
+                        db.SaveChanges();
+                    }
                     RefreshList();
                     ClearDetails();
                 }

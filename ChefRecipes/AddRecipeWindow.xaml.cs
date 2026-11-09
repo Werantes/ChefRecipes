@@ -6,13 +6,41 @@ namespace ChefRecipes
 {
     public partial class AddRecipeWindow : Window
     {
-        private AppDbContext db;
+        private readonly int? editingRecipeId;
 
-        public AddRecipeWindow(AppDbContext db)
+        public AddRecipeWindow(int? recipeId = null)
         {
             InitializeComponent();
-            this.db = db;
-            this.Owner = Application.Current.MainWindow;
+            editingRecipeId = recipeId;
+            Owner = Application.Current.MainWindow;
+
+            if (editingRecipeId != null)
+            {
+                Title = "Редактировать рецепт";
+                LoadRecipe(editingRecipeId.Value);
+            }
+            else
+            {
+                Title = "Добавить рецепт";
+            }
+        }
+
+        private void LoadRecipe(int recipeId)
+        {
+            using var db = new AppDbContext();
+            var recipe = db.Recipes.FirstOrDefault(r => r.Id == recipeId);
+            if (recipe == null) return;
+
+            db.Entry(recipe).Collection(r => r.Ingredients).Load();
+            db.Entry(recipe).Collection(r => r.Steps).Load();
+
+            TitleBox.Text = recipe.Title;
+            DescBox.Text = recipe.Description;
+            TimeBox.Text = recipe.CookingTimeMinutes.ToString();
+            IngBox.Text = string.Join(Environment.NewLine,
+                recipe.Ingredients.Select(i => $"{i.Name} - {i.Quantity}"));
+            StepsBox.Text = string.Join(Environment.NewLine,
+                recipe.Steps.OrderBy(s => s.StepNumber).Select(s => s.Description));
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
@@ -23,43 +51,72 @@ namespace ChefRecipes
                 return;
             }
 
-            int minutes = 0;
-            int.TryParse(TimeBox.Text, out minutes);
-
-            var recipe = new Recipe
+            if (!int.TryParse(TimeBox.Text, out int minutes) || minutes < 0)
             {
-                Title = TitleBox.Text.Trim(),
-                Description = DescBox.Text.Trim(),
-                CookingTimeMinutes = minutes,
-                Ingredients = new System.Collections.Generic.List<Ingredient>(),
-                Steps = new System.Collections.Generic.List<Step>()
-            };
-
-            var ingredients = IngBox.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var ing in ingredients)
-            {
-                var parts = ing.Split('-');
-                recipe.Ingredients.Add(new Ingredient
-                {
-                    Name = parts[0].Trim(),
-                    Quantity = parts.Length > 1 ? parts[1].Trim() : ""
-                });
+                MessageBox.Show("Введите корректное время в минутах!");
+                return;
             }
 
-            var steps = StepsBox.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < steps.Length; i++)
+            try
             {
-                recipe.Steps.Add(new Step
-                {
-                    StepNumber = i + 1,
-                    Description = steps[i].Trim()
-                });
-            }
+                using var db = new AppDbContext();
 
-            db.Recipes.Add(recipe);
-            db.SaveChanges();
-            DialogResult = true;
-            Close();
+                Recipe recipe;
+                if (editingRecipeId == null)
+                {
+                    recipe = new Recipe();
+                    db.Recipes.Add(recipe);
+                }
+                else
+                {
+                    recipe = db.Recipes.FirstOrDefault(r => r.Id == editingRecipeId.Value)!;
+                    if (recipe == null)
+                    {
+                        MessageBox.Show("Рецепт не найден (возможно, был удалён).");
+                        return;
+                    }
+
+                    db.Entry(recipe).Collection(r => r.Ingredients).Load();
+                    db.Entry(recipe).Collection(r => r.Steps).Load();
+
+                    db.Ingredients.RemoveRange(recipe.Ingredients.ToList());
+                    db.Steps.RemoveRange(recipe.Steps.ToList());
+                    recipe.Ingredients.Clear();
+                    recipe.Steps.Clear();
+                }
+
+                recipe.Title = TitleBox.Text.Trim();
+                recipe.Description = DescBox.Text.Trim();
+                recipe.CookingTimeMinutes = minutes;
+
+                foreach (var line in IngBox.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var parts = line.Split('-');
+                    recipe.Ingredients.Add(new Ingredient
+                    {
+                        Name = parts[0].Trim(),
+                        Quantity = parts.Length > 1 ? parts[1].Trim() : ""
+                    });
+                }
+
+                var stepLines = StepsBox.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < stepLines.Length; i++)
+                {
+                    recipe.Steps.Add(new Step
+                    {
+                        StepNumber = i + 1,
+                        Description = stepLines[i].Trim()
+                    });
+                }
+
+                db.SaveChanges();
+                DialogResult = true;
+                Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при сохранении: {ex.Message}");
+            }
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
